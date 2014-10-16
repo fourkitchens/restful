@@ -131,6 +131,9 @@ abstract class RestfulBase extends RestfulPluginBase implements RestfulInterface
    */
   public static function cleanRequest(&$request) {
     unset($request['__application']);
+
+    // @todo: How to get this in a clean way?
+    unset($request['id']);
   }
 
   /**
