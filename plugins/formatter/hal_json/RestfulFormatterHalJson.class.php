@@ -26,13 +26,13 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
     // Here we get the data after calling the backend storage for the resources.
     $context = array();
     $context['handler'] = get_class($this->handler);
-    //$context['resource'] = $this->handler->plugin['resource'];
-    $context['request'] = $this->handler->request['q'];
+    $context['resource'] = $this->handler->plugin['resource'];
+    //$context['request'] = $this->handler->request['q'];
     drupal_alter('restfulFormatterHal_prepare', $data, $context);
     $output = $data;
 
     if (isset($data['_embedded'])) {
-     $this->addEmbeddedHateos($data);
+     $this->addEmbeddedHateos($output);
     }
 
     if (!empty($this->handler)) {
@@ -72,7 +72,15 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
     if (!$this->handler) {
       return;
     }
-    $request = $this->handler->getRequest()
+    $request = $this->handler->getRequest();
+
+    $resource = $this->handler->plugin['resource'];
+    foreach ($data['_embedded']['fk:'. $resource] as &$item) {
+      $link= new stdClass();
+      $link->href = $base_url .'/'. $request['q'] . '/'. $item['id'];
+      $item['_links'] = array('self' => $link);
+    }
+   $foo = $data;
   }
   /**
    * Add HATEOAS links to list of item.
@@ -84,7 +92,7 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
     if (!$this->handler) {
       return;
     }
-    $request = $this->handler->getRequest($request, array('absolute' => FALSE));
+    $request = $this->handler->getRequest();
 
     if (!$data['_links']) {
       $data['_links'] = array();
@@ -94,7 +102,7 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
     if ($page > 1) {
       $request['page'] = $page - 1;
       $previous = new stdClass();
-      $previous->href = $this->handler->getUrl($request, array('absolute' => FALSE));
+      $previous->href = $this->handler->getUrl();
       $data['_links']['previous'] = $previous;
     }
 
