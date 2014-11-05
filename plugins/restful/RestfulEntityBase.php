@@ -126,10 +126,12 @@ abstract class RestfulEntityBase extends \RestfulDataProviderEFQ implements \Res
       entity_load($entity_type, $ids);
     }
 
-    $return = array();
+    $return = array('_embedded'=> array());
+
+    $resource = $this->plugin['resource'];
 
     foreach ($ids as $id) {
-      $return[] = $this->viewEntity($id);
+      $return['_embedded']['fk:' . $resource][] = $this->viewEntity($id);
     }
 
     return $return;

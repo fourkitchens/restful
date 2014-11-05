@@ -24,7 +24,16 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
       return $data;
     }
     // Here we get the data after calling the backend storage for the resources.
-    $output = array('data' => $data);
+    $context = array();
+    $context['handler'] = get_class($this->handler);
+    $context['resource'] = $this->handler->plugin['resource'];
+    //$context['request'] = $this->handler->request['q'];
+    drupal_alter('restfulFormatterHal_prepare', $data, $context);
+    $output = $data;
+
+    if (isset($data['_embedded'])) {
+     $this->addEmbeddedHateos($output);
+    }
 
     if (!empty($this->handler)) {
       if (method_exists($this->handler, 'isListRequest') && !$this->handler->isListRequest()) {
@@ -57,6 +66,23 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
   }
 
   /**
+   * Add HATEOAS links to items in a list
+   */
+  protected function addEmbeddedHateos(array &$data) {
+    if (!$this->handler) {
+      return;
+    }
+    $request = $this->handler->getRequest();
+
+    $resource = $this->handler->plugin['resource'];
+    foreach ($data['_embedded']['fk:'. $resource] as &$item) {
+      $link= new stdClass();
+      $link->href = $base_url .'/'. $request['q'] . '/'. $item['id'];
+      $item['_links'] = array('self' => $link);
+    }
+   $foo = $data;
+  }
+  /**
    * Add HATEOAS links to list of item.
    *
    * @param $data
@@ -68,12 +94,16 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
     }
     $request = $this->handler->getRequest();
 
-    $data['_links'] = array();
+    if (!$data['_links']) {
+      $data['_links'] = array();
+    }
     $page = !empty($request['page']) ? $request['page'] : 1;
 
     if ($page > 1) {
       $request['page'] = $page - 1;
-      $data['_links']['previous'] = $this->handler->getUrl($request);
+      $previous = new stdClass();
+      $previous->href = $this->handler->getUrl();
+      $data['_links']['previous'] = $previous;
     }
 
     // We know that there are more pages if the total count is bigger than the
@@ -81,10 +111,33 @@ class RestfulFormatterHalJson extends \RestfulFormatterBase implements \RestfulF
     // previous pages.
     $items_per_page = $this->handler->getRange();
     $previous_items = ($page - 1) * $items_per_page;
-    if ($data['count'] > count($data['data']) + $previous_items) {
+    if ($data['count'] > count($data['_embedded']) + $previous_items) {
       $request['page'] = $page + 1;
-      $data['_links']['next'] = $this->handler->getUrl($request);
+      $next = new stdClass();
+      $next->href = $this->handler->getUrl($request);
+      $data['_links']['next'] = $next;
     }
+
+    // add curies
+    global $base_url;
+    $curies = array();
+    $curie = new stdClass();
+    $curie->name = "fk";
+    $curie->href = $base_url . "/api-docs/{rel}";
+    $curie->templated = true;
+    $curies[] = $curie;
+    $data['_links']['curies'] = $curies;
+    $curied_links = array();
+    $dontDocumentMe = array('curies', 'self');
+
+    foreach ($data['_links'] as $rel => $link) {
+      if (!in_array($rel, $dontDocumentMe)) {
+        $curied_links[$curie->name . ':' . $rel] = $link;
+      }
+      else {
+        $curied_links[$rel] = $link;
+      }
+    }
+    $data['_links'] = $curied_links;
   }
 }
-
